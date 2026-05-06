@@ -4,6 +4,8 @@
 
 AI Submission Evaluator is a Next.js application built to accept assignment submissions, evaluate them using Google Gemini AI, and display structured AI feedback.
 
+![Home Page](assets/screenshot-home.png)
+
 It supports:
 - text-based submissions
 - file uploads for PDF/DOCX and plain text/code files
@@ -12,6 +14,17 @@ It supports:
 - admin review, filtering, and score override
 
 The UI uses Tailwind CSS with a dark glassmorphism theme and the backend runs on Next.js App Router with Prisma for PostgreSQL.
+
+## Screenshots
+
+### Home Page
+![Home Page](assets/screenshot-home.png)
+
+### Assignment Submission Form
+![Assignment Submission Form](assets/screenshot-submit.png)
+
+### Evaluation Results
+![Evaluation Results](assets/screenshot-results.png)
 
 ---
 
