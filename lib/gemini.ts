@@ -7,6 +7,19 @@ const extractJson = (text: string) => {
   let trimmed = text.trim();
   trimmed = trimmed.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
 
+  // If the model returned a JSON string encoded inside quotes (e.g. "{...}"),
+  // try to unquote it first so we can parse the inner JSON.
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const unquoted = JSON.parse(trimmed);
+      if (typeof unquoted === 'string' && unquoted.trim().length) {
+        trimmed = unquoted.trim();
+      }
+    } catch (e) {
+      // fallthrough; we'll try to find JSON braces below
+    }
+  }
+
   // find first JSON opener ({ or [) and extract the balanced JSON substring
   const idx = trimmed.search(/[\{\[]/);
   if (idx === -1) throw new Error('Gemini response did not contain valid JSON.');

@@ -26,6 +26,18 @@ const extractJson = (text: string) => {
   // strip common fences
   trimmed = trimmed.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
 
+  // If AI returned the JSON as a quoted string, unquote it first
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const unquoted = JSON.parse(trimmed);
+      if (typeof unquoted === 'string' && unquoted.trim().length) {
+        trimmed = unquoted.trim();
+      }
+    } catch (e) {
+      // ignore and continue
+    }
+  }
+
   const idx = trimmed.search(/[\{\[]/);
   if (idx === -1) throw new Error('AI response did not contain JSON object');
 
