@@ -20,13 +20,50 @@ const evaluationSchema = z.object({
 });
 
 const extractJson = (text: string) => {
-  const trimmed = text.trim();
-  const first = trimmed.indexOf('{');
-  const last = trimmed.lastIndexOf('}');
-  if (first === -1 || last === -1) {
-    throw new Error('AI response did not contain JSON object');
+  if (!text || typeof text !== 'string') throw new Error('No text to extract JSON from.');
+
+  let trimmed = text.trim();
+  // strip common fences
+  trimmed = trimmed.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
+
+  const idx = trimmed.search(/[\{\[]/);
+  if (idx === -1) throw new Error('AI response did not contain JSON object');
+
+  const open = trimmed[idx];
+  const close = open === '{' ? '}' : ']';
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = idx; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === open) {
+      depth++;
+    } else if (ch === close) {
+      depth--;
+      if (depth === 0) {
+        return trimmed.slice(idx, i + 1);
+      }
+    }
   }
-  return trimmed.slice(first, last + 1);
+
+  throw new Error('AI response did not contain JSON object');
 };
 
 const parseAICandidate = (responseBody: any) => {
@@ -96,58 +133,86 @@ export const evaluateSubmission = async (contentText: string) => {
   }
 
   const systemPrompt = buildSystemPrompt(contentText);
-  const models = ['gemini-2.5-pro', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+  const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
   let lastError: Error | null = null;
+
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
   for (const model of models) {
     const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: systemPrompt }]
+    // retry per-model for transient errors
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: systemPrompt }]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1024
             }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024
-          }
-        })
-      });
+          })
+        });
 
-      const responseText = await response.text();
-      if (!response.ok) {
-        if (response.status === 503 || response.status === 404) {
-          lastError = new Error(`Gemini API model ${model} unavailable: ${response.status} ${responseText}`);
+        const responseText = await response.text();
+
+        if (!response.ok) {
+          // transient statuses: retry
+          if (response.status === 429 || response.status === 503 || response.status === 502 || response.status === 504) {
+            lastError = new Error(`Gemini API transient error (model=${model} attempt=${attempt}): ${response.status} ${responseText}`);
+            // exponential backoff
+            await sleep(500 * attempt);
+            continue;
+          }
+          // if model not found or permanently failing, break to try next model
+          if (response.status === 404) {
+            lastError = new Error(`Gemini model not found: ${model} (${response.status})`);
+            break;
+          }
+          throw new Error(`Gemini API call failed: ${response.status} ${responseText}`);
+        }
+
+        const data = (() => {
+          try {
+            return JSON.parse(responseText);
+          } catch (e) {
+            // some responses may already be plain text; keep raw
+            return { text: responseText };
+          }
+        })();
+
+        const rawText = parseAICandidate(data);
+
+        if (!rawText) {
+          throw new Error('Empty response from Gemini API');
+        }
+
+        const jsonText = extractJson(rawText);
+        const parsed = JSON.parse(jsonText);
+        const validated = evaluationSchema.parse(parsed);
+
+        return validated;
+      } catch (error: any) {
+        if (error instanceof z.ZodError) {
+          throw new Error(`Evaluation validation failed: ${error.message}`);
+        }
+        lastError = error;
+        // if last attempt for this model, break to try the next model
+        if (attempt < 3) {
+          await sleep(300 * attempt);
           continue;
         }
-        throw new Error(`Gemini API call failed: ${response.status} ${responseText}`);
+        break;
       }
-
-      const data = JSON.parse(responseText);
-      const rawText = parseAICandidate(data);
-
-      if (!rawText) {
-        throw new Error('Empty response from Gemini API');
-      }
-
-      const jsonText = extractJson(rawText);
-      const parsed = JSON.parse(jsonText);
-      const validated = evaluationSchema.parse(parsed);
-
-      return validated;
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        throw new Error(`Evaluation validation failed: ${error.message}`);
-      }
-      lastError = error;
     }
   }
 
