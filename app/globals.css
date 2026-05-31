@@ -5,15 +5,29 @@
 :root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #0d0d0d;
+  background-color: #080b10;
   color: #e5e7eb;
 }
 
 html,
 body {
   min-height: 100%;
-  background: radial-gradient(circle at top, rgba(0, 212, 170, 0.12), transparent 25%),
-    #0d0d0d;
+}
+
+html.dark,
+html.dark body {
+  background: radial-gradient(circle at top, rgba(0, 229, 192, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(0, 229, 192, 0.08), transparent 28%),
+    #080b10;
+  color-scheme: dark;
+}
+
+html.light,
+html.light body {
+  background: radial-gradient(circle at top, rgba(6, 182, 212, 0.08), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(6, 182, 212, 0.06), transparent 28%),
+    #ffffff;
+  color-scheme: light;
 }
 
 body {
@@ -31,11 +45,30 @@ textarea {
 }
 
 ::selection {
-  background: rgba(0, 212, 170, 0.24);
+  background: rgba(0, 229, 192, 0.24);
+}
+
+html.light ::selection {
+  background: rgba(6, 182, 212, 0.24);
 }
 
 .glass-panel {
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(14, 21, 38, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(20px);
 }
+
+html.light .glass-panel {
+  background: rgba(248, 250, 252, 0.82);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(20px);
+}
+
+.shadow-glow {
+  box-shadow: 0 24px 80px rgba(0, 229, 192, 0.14);
+}
+
+html.light .shadow-glow {
+  box-shadow: 0 24px 80px rgba(6, 182, 212, 0.14);
+}
+

@@ -1,5 +1,10 @@
 export function parseGeminiJSON(text: string) {
-  const cleaned = text.replace(/```(?:json)?/gi, '').trim();
+  let cleaned = text
+    .replace(/```(?:json)?/gi, '')
+    .replace(/^[^\[{]*/, '') // remove any text before first bracket
+    .replace(/[^\]{}]*$/, '') // remove any text after last bracket
+    .trim();
+
   if (!cleaned) {
     throw new Error('Empty response received from Gemini.');
   }
@@ -9,7 +14,7 @@ export function parseGeminiJSON(text: string) {
   } catch (error) {
     const firstBracket = cleaned.search(/[\[{]/);
     if (firstBracket === -1) {
-      throw new Error(`Unable to parse Gemini JSON response: ${cleaned}`);
+      throw new Error(`Unable to parse Gemini JSON: no JSON structure found in response. Raw: ${text.substring(0, 200)}`);
     }
 
     const opening = cleaned[firstBracket];
@@ -40,11 +45,20 @@ export function parseGeminiJSON(text: string) {
         depth -= 1;
         if (depth === 0) {
           const candidate = cleaned.slice(firstBracket, i + 1);
-          return JSON.parse(candidate);
+          try {
+            return JSON.parse(candidate);
+          } catch (innerError) {
+            // If still failing, try to fix common issues
+            const fixed = candidate
+              .replace(/[\n\r]/g, ' ') // normalize whitespace
+              .replace(/,\s*}/g, '}') // remove trailing commas in objects
+              .replace(/,\s*]/g, ']'); // remove trailing commas in arrays
+            return JSON.parse(fixed);
+          }
         }
       }
     }
 
-    throw new Error(`Unable to parse Gemini JSON response: ${cleaned}`);
+    throw new Error(`Unable to parse Gemini JSON: malformed structure. First 300 chars: ${cleaned.substring(0, 300)}`);
   }
 }
