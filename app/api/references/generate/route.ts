@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from '../../../../lib/session';
 import prisma from '../../../../lib/prisma';
 import { callGemini } from '../../../../lib/gemini';
+import { toUserFacingGeminiError, truncateForPrompt } from '../../../../lib/geminiModels';
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
@@ -49,14 +50,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No lectures found for the selected IDs.' }, { status: 404 });
     }
 
-    const lectureText = lectures.map((lecture, index) => `Lecture ${index + 1} (${lecture.fileName}):\n${lecture.textContent ?? '[no text extracted]'}\n`).join('\n');
+    const lectureText = truncateForPrompt(
+      lectures.map((lecture, index) => `Lecture ${index + 1} (${lecture.fileName}):\n${lecture.textContent ?? '[no text extracted]'}\n`).join('\n')
+    );
 
     const topicPrompt = `Extract the top 5 most important study topics from the lecture content below. Output only valid JSON in the form: { "topics": ["topic1", "topic2", ...] }.
 
 Lecture content:
 ${lectureText}
 Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your response with { and end with }`;
-    const topicResult = await callGemini(topicPrompt, 'gemini-2.5-flash', 800);
+    const topicResult = await callGemini(topicPrompt, undefined, 600);
     const topics = Array.isArray(topicResult.topics) ? topicResult.topics.slice(0, 5) : [];
     if (!topics.length) {
       return NextResponse.json({ error: 'Failed to extract topics from lecture content.' }, { status: 500 });
@@ -98,24 +101,11 @@ Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your re
           }))
         : [];
 
-      const scorePrompt = `Rate the educational relevance of each video title for the topic '${topic}'. Respond with only valid JSON in this format: { "videos": [ { "videoId": "...", "score": 1 }, ... ] }.
-
-Video titles:\n${videos.map((video) => `${video.videoId}: ${video.title}`).join('\n')}`;
-
-      const scoreResult = await callGemini(scorePrompt, 'gemini-2.5-flash', 800);
-      const scores = Array.isArray(scoreResult.videos)
-        ? scoreResult.videos.reduce((acc: Record<string, number>, item: any) => {
-            if (item.videoId && typeof item.score === 'number') acc[item.videoId] = item.score;
-            return acc;
-          }, {})
-        : {};
-
       const rankedVideos = videos
-        .map((video) => ({
+        .map((video, index) => ({
           ...video,
-          relevanceScore: scores[video.videoId] ?? 0
+          relevanceScore: videos.length - index
         }))
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
         .slice(0, 2);
 
       topicResults.push({ topic, videos: rankedVideos });
@@ -123,6 +113,6 @@ Video titles:\n${videos.map((video) => `${video.videoId}: ${video.title}`).join(
 
     return NextResponse.json({ success: true, topicResults });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Reference generation failed.' }, { status: 500 });
+    return NextResponse.json({ error: toUserFacingGeminiError(error) }, { status: 500 });
   }
 }

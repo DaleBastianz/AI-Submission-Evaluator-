@@ -1,65 +1,12 @@
-import { z } from 'zod';
-
-const extractJson = (text: string) => {
-  if (!text || typeof text !== 'string') throw new Error('No text to extract JSON from.');
-
-  // Remove common code fences
-  let trimmed = text.trim();
-  trimmed = trimmed.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
-
-  // If the model returned a JSON string encoded inside quotes (e.g. "{...}"),
-  // try to unquote it first so we can parse the inner JSON.
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    try {
-      const unquoted = JSON.parse(trimmed);
-      if (typeof unquoted === 'string' && unquoted.trim().length) {
-        trimmed = unquoted.trim();
-      }
-    } catch (e) {
-      // fallthrough; we'll try to find JSON braces below
-    }
-  }
-
-  // find first JSON opener ({ or [) and extract the balanced JSON substring
-  const idx = trimmed.search(/[\{\[]/);
-  if (idx === -1) throw new Error('Gemini response did not contain valid JSON.');
-
-  const open = trimmed[idx];
-  const close = open === '{' ? '}' : ']';
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = idx; i < trimmed.length; i++) {
-    const ch = trimmed[i];
-    if (inString) {
-      if (escape) {
-        escape = false;
-      } else if (ch === '\\') {
-        escape = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (ch === open) {
-      depth++;
-    } else if (ch === close) {
-      depth--;
-      if (depth === 0) {
-        return trimmed.slice(idx, i + 1);
-      }
-    }
-  }
-
-  throw new Error('Gemini response did not contain valid JSON.');
-};
+import { parseGeminiJSON } from './parseGeminiJSON';
+import {
+  geminiEndpoint,
+  isDailyQuotaExhausted,
+  isModelNotFoundError,
+  isQuotaError,
+  modelsToTry,
+  toUserFacingGeminiError
+} from './geminiModels';
 
 const parseAICandidate = (responseBody: any) => {
   const candidateText =
@@ -78,113 +25,123 @@ const parseAICandidate = (responseBody: any) => {
   return candidateText;
 };
 
-export const callGemini = async (prompt: string, model = 'gemini-2.5-flash', maxOutputTokens = 1200) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured.');
-  }
-
-  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-  const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens,
-          topP: 0.95,
-          candidateCount: 1
-        }
-      })
-    });
-
-    const responseText = await response.text();
-
-    if (!response.ok) {
-      if ([429, 502, 503, 504].includes(response.status) && attempt < 3) {
-        await sleep(400 * attempt);
-        continue;
-      }
-      throw new Error(`Gemini API error ${response.status}: ${responseText}`);
-    }
-
-    const data = (() => {
-      try {
-        return JSON.parse(responseText);
-      } catch (e) {
-        return { text: responseText };
-      }
-    })();
-
-    const rawText = parseAICandidate(data);
-    const jsonText = extractJson(rawText);
-    return JSON.parse(jsonText);
-  }
-  throw new Error('Gemini API failed after retries.');
+type GenerateOptions = {
+  maxOutputTokens: number;
+  jsonMode: boolean;
+  temperature: number;
 };
 
-export const callGeminiText = async (prompt: string, model = 'gemini-2.5-flash', maxOutputTokens = 1200) => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured.');
-  }
+class GeminiModelError extends Error {
+  modelNotFound?: boolean;
+  quotaExhausted?: boolean;
 
+  constructor(message: string, flags: { modelNotFound?: boolean; quotaExhausted?: boolean } = {}) {
+    super(message);
+    this.modelNotFound = flags.modelNotFound;
+    this.quotaExhausted = flags.quotaExhausted;
+  }
+}
+
+async function generateOnce(model: string, prompt: string, apiKey: string, options: GenerateOptions) {
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-  const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const endpoint = geminiEndpoint(model, apiKey);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
-          }
-        ],
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens,
+          temperature: options.temperature,
+          maxOutputTokens: options.maxOutputTokens,
           topP: 0.95,
-          candidateCount: 1
+          candidateCount: 1,
+          ...(options.jsonMode ? { responseMimeType: 'application/json' } : {})
         }
       })
     });
 
     const responseText = await response.text();
+
     if (!response.ok) {
-      if ([429, 502, 503, 504].includes(response.status) && attempt < 3) {
-        await sleep(400 * attempt);
+      if (isModelNotFoundError(response.status, responseText)) {
+        throw new GeminiModelError(`Gemini model not found: ${model}`, { modelNotFound: true });
+      }
+
+      if (isQuotaError(response.status, responseText)) {
+        if (isDailyQuotaExhausted(responseText)) {
+          throw new GeminiModelError(`Quota exhausted for ${model}`, { quotaExhausted: true });
+        }
+        if (attempt < 3) {
+          const retryMatch = responseText.match(/"retryDelay":\s*"(\d+)s"/);
+          const delayMs = retryMatch ? Number(retryMatch[1]) * 1000 + 500 : 2000 * attempt;
+          await sleep(Math.min(delayMs, 15_000));
+          continue;
+        }
+        throw new GeminiModelError(`Rate limited on ${model}`, { quotaExhausted: true });
+      }
+
+      if ([502, 503, 504].includes(response.status) && attempt < 3) {
+        await sleep(500 * attempt);
         continue;
       }
+
       throw new Error(`Gemini API error ${response.status}: ${responseText}`);
     }
 
     const data = (() => {
       try {
         return JSON.parse(responseText);
-      } catch (e) {
+      } catch {
         return { text: responseText };
       }
     })();
 
-    const rawText = parseAICandidate(data);
-    return rawText;
+    return parseAICandidate(data);
   }
 
   throw new Error('Gemini API failed after retries.');
+}
+
+async function runWithModelFallback(
+  prompt: string,
+  preferredModel: string | undefined,
+  maxOutputTokens: number,
+  jsonMode: boolean
+) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured.');
+  }
+
+  let lastError: Error | null = null;
+  const temperature = jsonMode ? 0.2 : 0.3;
+
+  for (const model of modelsToTry(preferredModel)) {
+    try {
+      const rawText = await generateOnce(model, prompt, apiKey, {
+        maxOutputTokens,
+        jsonMode,
+        temperature
+      });
+      return jsonMode ? parseGeminiJSON(rawText) : rawText;
+    } catch (error: any) {
+      lastError = error;
+      if (error instanceof GeminiModelError && (error.modelNotFound || error.quotaExhausted)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error(toUserFacingGeminiError(lastError));
+}
+
+export const callGemini = async (prompt: string, preferredModel?: string, maxOutputTokens = 2048) => {
+  return runWithModelFallback(prompt, preferredModel, maxOutputTokens, true);
+};
+
+export const callGeminiText = async (prompt: string, preferredModel?: string, maxOutputTokens = 2048) => {
+  return runWithModelFallback(prompt, preferredModel, maxOutputTokens, false);
 };

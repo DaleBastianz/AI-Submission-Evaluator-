@@ -2,66 +2,85 @@ import Link from 'next/link';
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen px-6 py-12 text-white">
+    <main className="min-h-[calc(100vh-4.5rem)] bg-edu-page px-6 py-10 text-edu-text">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-16 flex flex-col gap-8 rounded-[2rem] border border-white/5 bg-gradient-to-br from-slate-950/80 to-slate-900/70 p-10 shadow-glow">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="mb-4 inline-flex rounded-full bg-cyan-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                AI evaluation for submissions
-              </p>
-              <h1 className="text-4xl font-semibold text-white sm:text-5xl">
-                Your smart assignment submission portal with AI scoring.
-              </h1>
-              <p className="mt-6 max-w-2xl text-slate-300 sm:text-lg">
-                Submit texts, PDFs, DOCX files or links, then get instant AI feedback on understanding,
-                code quality, completeness and real-world applicability.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 text-sm text-slate-300">
-              <span>Built with:</span>
-              <div className="flex flex-wrap gap-3">
-                {['Next.js', 'Tailwind CSS', 'Prisma', 'PostgreSQL', 'Gemini'].map((tech) => (
-                  <span key={tech} className="rounded-full border border-slate-600/70 bg-white/5 px-4 py-2">
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            </div>
+        <header className="mb-12 flex flex-col gap-8 rounded-[2rem] border border-edu-border bg-edu-surface p-10 shadow-glow">
+          <div>
+            <p className="mb-4 inline-flex rounded-full bg-cyan-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.24em] text-edu-accent">
+              EduAI Learning Management System
+            </p>
+            <h1 className="text-4xl font-semibold text-edu-text sm:text-5xl">
+              AI-powered study tools for assignments, exams, and lectures.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg text-edu-muted">
+              Submit work for AI grading, upload lectures, chat with an AI professor, generate exam prep, find video
+              references, and practice past papers — all in one student workspace.
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Link href="/submit-assignment" className="rounded-3xl bg-cyan-500 px-6 py-4 text-center text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
-              Submit assignment
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/register"
+              className="rounded-3xl bg-cyan-500 px-6 py-4 text-center text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+            >
+              Create account
             </Link>
-            <Link href="/my-results" className="rounded-3xl border border-white/10 bg-slate-950/80 px-6 py-4 text-center text-sm text-slate-200 transition hover:border-cyan-500/40">
-              View my results
+            <Link
+              href="/login"
+              className="rounded-3xl border border-cyan-500/40 bg-cyan-500/10 px-6 py-4 text-center text-sm font-semibold text-edu-accent transition hover:bg-cyan-500/20"
+            >
+              Sign in
             </Link>
-            <Link href="/admin" className="rounded-3xl border border-white/10 bg-slate-950/80 px-6 py-4 text-center text-sm text-slate-200 transition hover:border-cyan-500/40">
-              Admin dashboard
+            <Link
+              href="/dashboard"
+              className="rounded-3xl border border-edu-border px-6 py-4 text-center text-sm text-edu-text transition hover:border-cyan-500/40"
+            >
+              Open dashboard
             </Link>
           </div>
         </header>
 
-        <section className="grid gap-6 md:grid-cols-3">
+        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[
             {
-              title: 'Fast AI scoring',
-              description: 'Let the engine score and grade every assignment automatically.'
+              title: 'Submit Assignment',
+              description: 'Upload text, files, or links and receive instant AI scores and feedback.',
+              href: '/submit-assignment'
             },
             {
-              title: 'File + link support',
-              description: 'Upload PDF/DOCX or submit a GitHub / web URL for evaluation.'
+              title: 'Exam Tutor',
+              description: 'Generate cheat sheets, flashcards, sample exams, and study notes from your lectures.',
+              href: '/exam-tutor'
             },
             {
-              title: 'Actionable feedback',
-              description: 'Strengths, weaknesses, and improvements are surfaced instantly.'
+              title: 'AI Professor',
+              description: 'Ask questions grounded in your uploaded lecture materials.',
+              href: '/ai-professor'
+            },
+            {
+              title: 'Content Hub',
+              description: 'Upload and manage lecture PDFs, slides, and course files.',
+              href: '/content-hub'
+            },
+            {
+              title: 'References',
+              description: 'Discover curated YouTube videos matched to your lecture topics.',
+              href: '/references'
+            },
+            {
+              title: 'Past Papers',
+              description: 'Upload past papers and get AI-generated answers with mark scheme hints.',
+              href: '/past-papers'
             }
           ].map((card) => (
-            <div key={card.title} className="glass-panel rounded-[1.75rem] p-6 shadow-xl">
-              <h2 className="mb-3 text-xl font-semibold text-white">{card.title}</h2>
-              <p className="text-slate-300">{card.description}</p>
-            </div>
+            <Link
+              key={card.href}
+              href={card.href}
+              className="glass-panel rounded-[1.75rem] p-6 shadow-xl transition hover:border-cyan-500/30"
+            >
+              <h2 className="mb-3 text-xl font-semibold text-edu-text">{card.title}</h2>
+              <p className="text-edu-muted">{card.description}</p>
+            </Link>
           ))}
         </section>
       </div>

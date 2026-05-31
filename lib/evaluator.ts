@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  geminiEndpoint,
+  isDailyQuotaExhausted,
+  isModelNotFoundError,
+  isQuotaError,
+  toUserFacingGeminiError
+} from './geminiModels';
+import { parseGeminiJSON } from './parseGeminiJSON';
 
 const evaluationSchema = z.object({
   score: z.number().int().min(0).max(100),
@@ -19,64 +27,6 @@ const evaluationSchema = z.object({
   final_feedback: z.string()
 });
 
-const extractJson = (text: string) => {
-  if (!text || typeof text !== 'string') throw new Error('No text to extract JSON from.');
-
-  let trimmed = text.trim();
-  // strip common fences
-  trimmed = trimmed.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
-
-  // If AI returned the JSON as a quoted string, unquote it first
-  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-    try {
-      const unquoted = JSON.parse(trimmed);
-      if (typeof unquoted === 'string' && unquoted.trim().length) {
-        trimmed = unquoted.trim();
-      }
-    } catch (e) {
-      // ignore and continue
-    }
-  }
-
-  const idx = trimmed.search(/[\{\[]/);
-  if (idx === -1) throw new Error('AI response did not contain JSON object');
-
-  const open = trimmed[idx];
-  const close = open === '{' ? '}' : ']';
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = idx; i < trimmed.length; i++) {
-    const ch = trimmed[i];
-    if (inString) {
-      if (escape) {
-        escape = false;
-      } else if (ch === '\\') {
-        escape = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (ch === open) {
-      depth++;
-    } else if (ch === close) {
-      depth--;
-      if (depth === 0) {
-        return trimmed.slice(idx, i + 1);
-      }
-    }
-  }
-
-  throw new Error('AI response did not contain JSON object');
-};
 
 const parseAICandidate = (responseBody: any) => {
   if (!responseBody) {
@@ -112,6 +62,7 @@ Evaluate the submission exactly on these dimensions:
 
 Only respond with valid JSON containing the exact fields below.
 Do not add prose, commentary, or markdown outside the JSON.
+Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your response with { and end with }.
 
 Output schema:
 {
@@ -145,13 +96,13 @@ export const evaluateSubmission = async (contentText: string) => {
   }
 
   const systemPrompt = buildSystemPrompt(contentText);
-  const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+  const models = ['gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'];
   let lastError: Error | null = null;
 
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
   for (const model of models) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const endpoint = geminiEndpoint(model, apiKey);
 
     // retry per-model for transient errors
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -170,7 +121,8 @@ export const evaluateSubmission = async (contentText: string) => {
             ],
             generationConfig: {
               temperature: 0.1,
-              maxOutputTokens: 1024
+              maxOutputTokens: 2048,
+              responseMimeType: 'application/json'
             }
           })
         });
@@ -178,17 +130,22 @@ export const evaluateSubmission = async (contentText: string) => {
         const responseText = await response.text();
 
         if (!response.ok) {
-          // transient statuses: retry
-          if (response.status === 429 || response.status === 503 || response.status === 502 || response.status === 504) {
-            lastError = new Error(`Gemini API transient error (model=${model} attempt=${attempt}): ${response.status} ${responseText}`);
-            // exponential backoff
+          if (isModelNotFoundError(response.status, responseText) || isQuotaError(response.status, responseText)) {
+            if (isDailyQuotaExhausted(responseText) || isModelNotFoundError(response.status, responseText)) {
+              lastError = new Error(`Model unavailable or quota exhausted: ${model}`);
+              break;
+            }
+            if (attempt < 3) {
+              await sleep(1000 * attempt);
+              continue;
+            }
+            lastError = new Error(`Rate limited on ${model}`);
+            break;
+          }
+          if (response.status === 503 || response.status === 502 || response.status === 504) {
+            lastError = new Error(`Gemini API transient error (model=${model}): ${response.status}`);
             await sleep(500 * attempt);
             continue;
-          }
-          // if model not found or permanently failing, break to try next model
-          if (response.status === 404) {
-            lastError = new Error(`Gemini model not found: ${model} (${response.status})`);
-            break;
           }
           throw new Error(`Gemini API call failed: ${response.status} ${responseText}`);
         }
@@ -208,8 +165,7 @@ export const evaluateSubmission = async (contentText: string) => {
           throw new Error('Empty response from Gemini API');
         }
 
-        const jsonText = extractJson(rawText);
-        const parsed = JSON.parse(jsonText);
+        const parsed = parseGeminiJSON(rawText);
         const validated = evaluationSchema.parse(parsed);
 
         return validated;
@@ -228,5 +184,5 @@ export const evaluateSubmission = async (contentText: string) => {
     }
   }
 
-  throw lastError ?? new Error('Gemini API request failed for all supported models.');
+  throw new Error(toUserFacingGeminiError(lastError ?? new Error('Gemini API request failed for all supported models.')));
 };

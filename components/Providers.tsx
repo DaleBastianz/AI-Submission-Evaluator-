@@ -28,6 +28,11 @@ const ThemeContext = createContext<ThemeContextType>({
   toggleTheme: () => {}
 });
 
+function applyThemeClass(theme: 'light' | 'dark') {
+  document.documentElement.classList.remove('light', 'dark');
+  document.documentElement.classList.add(theme);
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionContextType>({
     data: null,
@@ -35,12 +40,13 @@ export function Providers({ children }: { children: ReactNode }) {
   });
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const [mounted, setMounted] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    setTheme(savedTheme || 'dark');
-    
+    const savedTheme = (localStorage.getItem('theme') || 'dark') as 'light' | 'dark';
+    setTheme(savedTheme);
+    applyThemeClass(savedTheme);
+
     const userId = localStorage.getItem('userId');
     if (!userId) {
       setSession({ data: null, status: 'unauthenticated' });
@@ -56,29 +62,28 @@ export function Providers({ children }: { children: ReactNode }) {
         status: 'authenticated'
       });
     }
-    
-    setMounted(true);
+
+    setReady(true);
   }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('light', newTheme === 'light');
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    applyThemeClass(newTheme);
   };
 
-  if (!mounted) {
-    return <>{children}</>;
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-edu-page text-edu-text">
+        <p className="text-sm text-edu-muted">Loading EduAI…</p>
+      </div>
+    );
   }
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <SessionContext.Provider value={session}>
-        <div className={theme === 'light' ? 'light' : 'dark'}>
-          {children}
-        </div>
-      </SessionContext.Provider>
+      <SessionContext.Provider value={session}>{children}</SessionContext.Provider>
     </ThemeContext.Provider>
   );
 }

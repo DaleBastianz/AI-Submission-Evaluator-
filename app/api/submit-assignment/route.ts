@@ -3,8 +3,10 @@ import path from 'path';
 import fs from 'fs/promises';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
+import { getServerSession } from '../../../lib/session';
 import prisma from '../../../lib/prisma';
 import { evaluateSubmission } from '../../../lib/evaluator';
+import { toUserFacingGeminiError } from '../../../lib/geminiModels';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,22 +62,27 @@ const validateEmail = (value?: string) => {
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(request);
     const formData = await request.formData();
-    const name = formData.get('name')?.toString().trim();
-    const email = formData.get('email')?.toString().trim();
     const title = formData.get('title')?.toString().trim();
     const type = formData.get('type')?.toString();
     const contentText = formData.get('contentText')?.toString().trim();
     const link = formData.get('link')?.toString().trim();
     const file = formData.get('assignmentFile') as File | null;
 
-    if (!name || !email || !title || !type) {
+    const name = session?.user?.name ?? formData.get('name')?.toString().trim();
+    const email = session?.user?.email ?? formData.get('email')?.toString().trim();
+    const userId = session?.user?.id ?? null;
+
+    if (!email || !title || !type) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
     }
 
     if (!validateEmail(email)) {
       return NextResponse.json({ error: 'Provide a valid email address.' }, { status: 400 });
     }
+
+    const submitterName = name || email.split('@')[0] || 'Student';
 
     let extractedText = '';
     let fileUrl: string | null = null;
@@ -127,12 +134,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unable to extract enough content for evaluation.' }, { status: 400 });
     }
 
-    const aiRequestContent = `Name: ${name}\nEmail: ${email}\nTitle: ${title}\nType: ${type}\nLink: ${link || 'N/A'}\nFile URL: ${fileUrl || 'N/A'}\n\nContent:\n${extractedText}`;
+    const aiRequestContent = `Name: ${submitterName}\nEmail: ${email}\nTitle: ${title}\nType: ${type}\nLink: ${link || 'N/A'}\nFile URL: ${fileUrl || 'N/A'}\n\nContent:\n${extractedText}`;
     const aiFeedback = await evaluateSubmission(aiRequestContent);
 
     const submission = await prisma.submission.create({
       data: {
-        name,
+        userId,
+        name: submitterName,
         email,
         title,
         type,
@@ -147,6 +155,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, submissionId: submission.id, score: aiFeedback.score, grade: aiFeedback.grade, feedback: aiFeedback });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Submission failed.' }, { status: 500 });
+    return NextResponse.json({ error: toUserFacingGeminiError(error) }, { status: 500 });
   }
 }

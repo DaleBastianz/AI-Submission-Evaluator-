@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from '../../../../lib/session';
 import prisma from '../../../../lib/prisma';
 import { callGemini } from '../../../../lib/gemini';
+import { toUserFacingGeminiError, truncateForPrompt } from '../../../../lib/geminiModels';
 import { extractTextFromBuffer, sanitizeFileName, saveUploadedFile, buildPublicUrl } from '../../../../lib/fileUtils';
 
 export const runtime = 'nodejs';
@@ -55,13 +56,16 @@ export async function POST(request: Request) {
     }
 
     const lectures = await prisma.lecture.findMany({ where: { id: { in: lectureIds }, userId: session.user.id } });
-    const lectureText = lectures.map((lecture, idx) => `Lecture ${idx + 1} (${lecture.fileName}):\n${lecture.textContent ?? '[no text]'}\n`).join('\n');
+    const lectureText = truncateForPrompt(
+      lectures.map((lecture, idx) => `Lecture ${idx + 1} (${lecture.fileName}):\n${lecture.textContent ?? '[no text]'}\n`).join('\n')
+    );
+    const paperText = truncateForPrompt(textContent || questionText, 8000);
 
     let prompt = '';
     if (fileUrl) {
       prompt = `You are an AI tutor that solves past paper questions. Extract all individual questions from the following paper content, then generate structured answers.
 
-Paper text:\n${textContent}\n
+Paper text:\n${paperText}\n
 If lecture content is available, cross-reference concepts with the lectures. Output only valid JSON:
 { "questions": [ { "question": "...", "shortAnswer": "...", "detailedAnswer": "...", "markSchemeHints": ["..."], "relatedTopics": ["..."], "difficulty": "easy|medium|hard", "lectureReference": "filename or null" } ] }
 
@@ -75,7 +79,7 @@ Lecture content:\n${lectureText}
 Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your response with { and end with }`;
     }
 
-    const aiResult = await callGemini(prompt, 'gemini-2.5-flash', 1500);
+    const aiResult = await callGemini(prompt, undefined, 4096);
     const record = await prisma.pastPaper.create({
       data: {
         userId: session.user.id,
@@ -88,6 +92,6 @@ Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your re
 
     return NextResponse.json({ success: true, aiAnswers: aiResult, pastPaper: record });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Past paper solve failed.' }, { status: 500 });
+    return NextResponse.json({ error: toUserFacingGeminiError(error) }, { status: 500 });
   }
 }

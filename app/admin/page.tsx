@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import PasswordInput from '../../components/PasswordInput';
 
 const gradeMap: Record<string, string> = {
   A: 'bg-emerald-500',
@@ -105,13 +106,13 @@ export default function AdminPage() {
           </div>
 
           {!authenticated ? (
-            <form onSubmit={handleLogin} className="flex flex-col gap-4 sm:flex-row">
-              <input
-                type="password"
+            <form onSubmit={handleLogin} className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <PasswordInput
+                wrapperClassName="flex-1"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Admin password"
-                className="flex-1 rounded-3xl border border-white/10 bg-slate-950/80 px-5 py-4 text-white outline-none transition focus:border-cyan-500/70"
+                autoComplete="current-password"
               />
               <button type="submit" className="rounded-3xl bg-cyan-500 px-6 py-4 font-semibold text-slate-950 transition hover:bg-cyan-400">
                 Unlock admin

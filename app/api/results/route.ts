@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from '../../../lib/session';
 import prisma from '../../../lib/prisma';
 
 export async function GET(request: Request) {
+  const session = await getServerSession(request);
   const url = new URL(request.url);
   const email = url.searchParams.get('email')?.trim();
+  const userId = session?.user?.id;
 
-  if (!email) {
-    return NextResponse.json({ error: 'Email query required.' }, { status: 400 });
+  if (!userId && !email) {
+    return NextResponse.json({ error: 'Authentication or email query required.' }, { status: 401 });
   }
 
+  const searchCondition = userId
+    ? { userId }
+    : { email: { equals: email!, mode: 'insensitive' as const } };
+
   const submissions = await prisma.submission.findMany({
-    where: { email: { equals: email, mode: 'insensitive' } },
+    where: searchCondition,
     orderBy: { createdAt: 'desc' }
   });
 

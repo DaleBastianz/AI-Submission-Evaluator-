@@ -207,7 +207,9 @@ Create `.env.local` with:
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 GEMINI_API_KEY="YOUR_GOOGLE_API_KEY"
+YOUTUBE_API_KEY="YOUR_YOUTUBE_API_KEY"
 ADMIN_PASSWORD="your-admin-password"
+NEXTAUTH_SECRET="your-nextauth-secret"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 

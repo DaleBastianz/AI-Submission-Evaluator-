@@ -1,21 +1,23 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
-  darkMode: ['class', '[class*="dark"]'],
-  content: [
-    './app/**/*.{js,ts,jsx,tsx}',
-    './components/**/*.{js,ts,jsx,tsx}'
-  ],
+  darkMode: 'class',
+  content: ['./app/**/*.{js,ts,jsx,tsx}', './components/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        bg: '#0d0d0d',
-        panel: '#11151f',
-        accent: '#00d4aa',
-        card: 'rgba(255,255,255,0.04)' 
+        edu: {
+          logo: 'var(--edu-logo-bg)',
+          page: 'var(--edu-page-bg)',
+          surface: 'var(--edu-surface)',
+          border: 'var(--edu-border)',
+          text: 'var(--edu-text)',
+          muted: 'var(--edu-text-muted)',
+          accent: 'var(--edu-accent)'
+        }
       },
       boxShadow: {
-        glow: '0 20px 60px rgba(0, 212, 170, 0.18)'
+        glow: '0 20px 60px rgba(6, 182, 212, 0.12)'
       }
     }
   },
