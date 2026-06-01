@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '../../../../lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const password = url.searchParams.get('password');
@@ -17,8 +19,14 @@ export async function GET(request: Request) {
   const where: any = {};
 
   if (type) where.type = type;
-  if (minScore) where.aiScore = { ...where.aiScore, gte: Number(minScore) };
-  if (maxScore) where.aiScore = { ...where.aiScore, lte: Number(maxScore) };
+  
+  // Handle aiScore filters
+  if (minScore || maxScore) {
+    where.aiScore = {};
+    if (minScore) where.aiScore.gte = Number(minScore);
+    if (maxScore) where.aiScore.lte = Number(maxScore);
+  }
+  
   if (startDate || endDate) {
     where.createdAt = {};
     if (startDate) where.createdAt.gte = new Date(startDate);
