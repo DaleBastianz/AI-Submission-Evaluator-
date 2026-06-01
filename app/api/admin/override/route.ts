@@ -3,6 +3,10 @@ import prisma from '../../../../lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed.' }, { status: 405 });
+}
+
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
