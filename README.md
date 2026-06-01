@@ -1,274 +1,206 @@
 # AI Submission Evaluator
 
-## Overview
+[![GitHub](https://img.shields.io/github/license/DaleBastianz/AI-Submission-Evaluator-)](https://github.com/DaleBastianz/AI-Submission-Evaluator-/blob/main/LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38BDF8?logo=tailwind-css)](https://tailwindcss.com/)
 
-AI Submission Evaluator is a Next.js application built to accept assignment submissions, evaluate them using Google Gemini AI, and display structured AI feedback.
+## 🎓 Overview
 
-![Home Page](assets/screenshot-home.png)
+AI Submission Evaluator is a comprehensive educational platform powered by Google Gemini AI. It provides students with instant, detailed feedback on assignments while giving educators powerful tools to manage submissions, generate study materials, and track learning progress.
 
-It supports:
-- text-based submissions
-- file uploads for PDF/DOCX and plain text/code files
-- URL link submissions with content extraction
-- results search per student email
-- admin review, filtering, and score override
 
-The UI uses Tailwind CSS with a dark glassmorphism theme and the backend runs on Next.js App Router with Prisma for PostgreSQL.
+## ✨ Key Features
 
-## Screenshots
+### 📝 Assignment Evaluation
+- **Multiple Submission Types**: Text, file uploads (PDF/DOCX), or URL links
+- **AI-Powered Grading**: Instant evaluation with detailed feedback
+- **Plagiarism Detection**: AI flags potential academic integrity issues
+- **Criteria-Based Scoring**: Breakdown across multiple evaluation dimensions
 
-### Home Page
-![Home Page](assets/screenshot-home.png)
+### 🤖 AI Study Assistant
+- **AI Professor**: Chat with an AI tutor for subject-specific help
+- **Exam Tutor**: Generate practice questions and study guides
+- **Past Papers Solver**: Get step-by-step solutions to past exam questions
 
-### Assignment Submission Form
-![Assignment Submission Form](assets/screenshot-submit.png)
+### 📚 Content Management
+- **Content Hub**: Upload and organize lecture materials
+- **References Generator**: Automatically create citations in APA, MLA, Harvard formats
+- **Mind Map Visualizer**: Create knowledge maps from study content
 
-### Evaluation Results
-![Evaluation Results](assets/screenshot-results.png)
+### 👥 User Management
+- **Authentication**: Secure login/register with NextAuth.js
+- **Student Dashboard**: Track submission history and progress
+- **Admin Panel**: Review, filter, and override AI grades
 
----
+## 🚀 Quick Start
 
-## Project Structure
+### Prerequisites
+- Node.js 18+ 
+- PostgreSQL database
+- Google Gemini API key
 
-- `app/page.tsx` — homepage with navigation links
-- `app/submit-assignment/page.tsx` — assignment submission panel
-- `app/my-results/page.tsx` — student results dashboard
-- `app/admin/page.tsx` — admin panel for review and overrides
-- `app/api/submit-assignment/route.ts` — submission backend endpoint
-- `app/api/results/route.ts` — search submissions by email
-- `app/api/admin/submissions/route.ts` — filtered admin listing
-- `app/api/admin/override/route.ts` — admin grade override
-- `lib/evaluator.ts` — Gemini evaluation engine
-- `lib/prisma.ts` — Prisma client wrapper
-- `prisma/schema.prisma` — DB schema definition
+### Installation
 
----
-
-## Key Panels and Flow
-
-### 1. Home Page
-
-The home page introduces the system and links to:
-- Submit Assignment
-- My Results
-- Admin Dashboard
-
-This is the landing experience and entry point for all users.
-
-### 2. Submit Assignment Panel
-
-This panel is the core user-facing submission screen.
-
-#### Supported modes:
-- **Text** — paste assignment text or code directly.
-- **File** — upload PDF, DOCX, TXT, MD, HTML, code files, and other text-based formats.
-- **Link** — submit a GitHub or web URL to evaluate content extracted from that page.
-
-#### How it works:
-1. The user enters name, email, title, and selects a submission type.
-2. Based on the type, the page shows the corresponding input control.
-3. On submit, the form posts to `/api/submit-assignment` with `FormData`.
-4. The backend extracts submission content:
-   - text mode uses `contentText`
-   - link mode fetches the web page or GitHub README content
-   - file mode saves the file and extracts text from PDF, DOCX, or plain text/code files
-5. The backend sends the extracted content to the AI evaluator.
-6. The system stores the result in the `Submission` table and returns structured AI feedback.
-
-### 3. Results Dashboard
-
-The My Results page allows users to search by email.
-
-#### Flow:
-1. Enter the student email.
-2. The UI requests `/api/results?email=...`.
-3. The backend returns all submissions matching that email.
-4. The page displays each submission with:
-   - assignment title
-   - submission type
-   - score and grade
-   - expandable feedback details
-   - criteria breakdown
-
-This panel is for students or reviewers to inspect the AI evaluation history.
-
-### 4. Admin Panel
-
-Admin access is protected by `ADMIN_PASSWORD`.
-
-#### Features:
-- login via password
-- filter submissions by type, score range, and date range
-- review submission details
-- override AI grade and score
-
-#### How it operates:
-1. The admin enters the password and unlocks the dashboard.
-2. Filters are applied and `/api/admin/submissions` is requested with query parameters.
-3. The backend validates the password and returns matching submissions.
-4. The admin can expand a submission to see AI feedback and override values.
-5. Override changes are submitted to `/api/admin/override`.
-6. The endpoint updates the Prisma `Submission` record.
-
----
-
-## Backend API Endpoints
-
-### `POST /api/submit-assignment`
-
-Accepts `FormData` with:
-- `name`
-- `email`
-- `title`
-- `type` (`text` | `file` | `link`)
-- `contentText` (for text submissions)
-- `assignmentFile` (for file uploads)
-- `link` (for URL submissions)
-
-The route:
-- validates required fields
-- extracts text from the submission
-- calls `evaluateSubmission`
-- saves the result to Prisma
-- returns `score`, `grade`, `feedback`, and `submissionId`
-
-### `GET /api/results?email=...`
-
-Returns all submissions for a given email address.
-
-### `GET /api/admin/submissions?password=...&type=...&minScore=...&maxScore=...&startDate=...&endDate=...`
-
-Returns admin-filtered submissions. Password auth is required.
-
-### `PUT /api/admin/override`
-
-Accepts JSON body with:
-- `password`
-- `submissionId`
-- `grade`
-- `score`
-
-Updates admin overrides on the selected submission.
-
----
-
-## AI Evaluation Engine
-
-The evaluation logic is implemented in `lib/evaluator.ts`.
-
-### AI flow:
-1. The backend builds a system prompt with the submission content.
-2. It uses Google Generative Language via the Gemini endpoint.
-3. The request is sent using the `generateContent` REST API.
-4. It tries a fallback list of supported models:
-   - `gemini-2.5-pro`
-   - `gemini-2.5-flash-lite`
-   - `gemini-2.0-flash`
-5. The response is parsed for candidate text.
-6. The system extracts the JSON object and validates it with `zod`.
-
-### Expected feedback schema:
-- `score`: 0-100
-- `grade`: A, B, C, D, F
-- `criteria`: numeric ratings for understanding, code quality, creativity, completeness, documentation, real_world
-- `strengths`: array of strings
-- `weaknesses`: array of strings
-- `improvements`: array of strings
-- `plagiarism_flag`: boolean
-- `ai_generated_flag`: boolean
-- `final_feedback`: string
-
----
-
-## Database Schema
-
-`prisma/schema.prisma` defines the `Submission` model:
-
-- `id`
-- `name`
-- `email`
-- `title`
-- `type`
-- `contentText`
-- `fileUrl`
-- `link`
-- `aiScore`
-- `aiGrade`
-- `aiFeedback` (JSON)
-- `createdAt`
-- `updatedAt`
-
----
-
-## Environment Variables
-
-Create `.env.local` with:
-
-```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-GEMINI_API_KEY="YOUR_GOOGLE_API_KEY"
-YOUTUBE_API_KEY="YOUR_YOUTUBE_API_KEY"
-ADMIN_PASSWORD="your-admin-password"
-NEXTAUTH_SECRET="your-nextauth-secret"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
+1. Clone the repository:
+```bash
+git clone https://github.com/DaleBastianz/AI-Submission-Evaluator-.git
+cd AI-Submission-Evaluator-
 ```
 
-Important:
-- `DATABASE_URL` must point to your PostgreSQL database.
-- `GEMINI_API_KEY` is used to call Google Gemini.
-- `ADMIN_PASSWORD` secures the admin dashboard.
-
----
-
-## Setup and Run
-
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-If you need to sync the database schema:
+3. Set up environment variables (create `.env.local`):
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+GEMINI_API_KEY="your-google-api-key"
+NEXTAUTH_SECRET="your-nextauth-secret"
+NEXTAUTH_URL="http://localhost:3000"
+ADMIN_PASSWORD="your-secure-admin-password"
+```
 
+4. Initialize the database:
 ```bash
+npx prisma generate
 npx prisma db push
 ```
 
-Then start the app:
-
+5. Start the development server:
 ```bash
 npm run dev
 ```
 
-Open:
+Visit `http://localhost:3000` to see the application.
 
-```text
-http://localhost:3000
+## 🎬 Demo Video
+
+A demo video can help reviewers quickly understand the app. To add a demo video to this repository:
+
+- Place an MP4 file at `public/demo/demo.mp4` (H.264 for broad browser support).
+- Start the dev server (`npm run dev`).
+- Open `http://localhost:3000/demo/` to view the demo player.
+
+If you want the video included in the repository, add the file to `public/demo/demo.mp4` and commit it. Alternatively, host the video elsewhere (YouTube/Vimeo) and link to it from this README.
+
+## 📁 Project Structure
+
+```
+AI-Submission-Evaluator-/
+├── app/
+│   ├── page.tsx                    # Landing page
+│   ├── login/                      # Authentication pages
+│   ├── register/
+│   ├── submit-assignment/          # Assignment submission
+│   ├── my-results/                 # Student results dashboard
+│   ├── admin/                      # Admin panel
+│   ├── dashboard/                  # User dashboard
+│   ├── ai-professor/               # AI chatbot
+│   ├── exam-tutor/                 # Exam preparation
+│   ├── past-papers/                # Past papers solver
+│   ├── content-hub/                # Lecture materials
+│   ├── references/                 # Citation generator
+│   └── api/                        # API routes
+│       ├── auth/                   # Authentication endpoints
+│       ├── submit-assignment/      # Submission handler
+│       ├── results/                # Results retrieval
+│       ├── ai-professor/           # AI chat endpoint
+│       ├── exam-tutor/             # Exam generation
+│       └── ...
+├── components/                     # Reusable UI components
+├── lib/                            # Utility functions
+│   ├── evaluator.ts               # AI evaluation engine
+│   ├── gemini.ts                  # Gemini API client
+│   ├── auth.ts                    # Authentication logic
+│   └── ...
+├── prisma/
+│   └── schema.prisma              # Database schema
+└── public/                         # Static assets
 ```
 
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Prisma ORM
+- **Database**: PostgreSQL
+- **AI**: Google Gemini API
+- **Authentication**: NextAuth.js
+- **Styling**: Tailwind CSS with dark glassmorphism theme
+
+## 📸 Screenshots
+
+
+## 🌐 Deployment
+
+### Deploy to Vercel (Recommended)
+
+1. Push your code to GitHub (already done!)
+2. Visit [Vercel](https://vercel.com) and import your repository
+3. Configure environment variables in Vercel dashboard
+4. Deploy — Vercel will automatically build and deploy your app
+
+Every git push will trigger an automatic deployment.
+
+### Environment Variables for Production
+
+Make sure to set these in your Vercel project settings:
+- `DATABASE_URL` - PostgreSQL connection string
+- `GEMINI_API_KEY` - Google Gemini API key
+- `NEXTAUTH_SECRET` - Generate with `openssl rand -base64 32`
+- `NEXTAUTH_URL` - Your production URL
+- `ADMIN_PASSWORD` - Secure admin password
+
+## 🔒 Security Considerations
+
+- All API routes are protected with authentication
+- Admin functions require admin password verification
+- Password hashing with bcrypt
+- Environment variables for sensitive data
+- CORS protection on API routes
+
+## 📝 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/login` | POST | User login |
+| `/api/auth/register` | POST | User registration |
+| `/api/submit-assignment` | POST | Submit assignment for evaluation |
+| `/api/results` | GET | Get student's submission history |
+| `/api/ai-professor/ask` | POST | Chat with AI professor |
+| `/api/exam-tutor/generate` | POST | Generate practice questions |
+| `/api/past-papers/solve` | POST | Solve past paper questions |
+| `/api/references/generate` | POST | Generate citations |
+| `/api/content-hub/upload` | POST | Upload lecture materials |
+| `/api/dashboard` | GET | Get user dashboard data |
+
+## 🤝 Contributing
+
+1. Create a feature branch from `develop`:
+   ```bash
+   git checkout develop
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes and commit:
+   ```bash
+   git commit -m "feat: add your feature"
+   ```
+
+3. Push and create a pull request to `develop`
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🙏 Acknowledgments
+
+- [Google Gemini API](https://ai.google.dev/) for AI capabilities
+- [Next.js](https://nextjs.org/) for the amazing framework
+- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
+- [Prisma](https://www.prisma.io/) for the type-safe ORM
+
 ---
 
-## User Flow Summary
-
-### Student / user flow
-1. Open the homepage.
-2. Go to `Submit Assignment`.
-3. Choose a submission type.
-4. Enter name, email, title, and submit.
-5. Receive instant AI score and feedback.
-6. Optionally go to `My Results` and search by email.
-
-### Admin flow
-1. Open `Admin`.
-2. Enter the admin password.
-3. Filter submissions by type, score, and date.
-4. Read AI feedback and review criteria.
-5. Override score or grade if needed.
-
----
-
-## Notes
-
-- The system saves feedback as JSON and reuses it across dashboards.
-- File uploads are stored under `public/uploads` and accessible by URL if `NEXT_PUBLIC_APP_URL` is set.
-- The admin dashboard uses query string password auth and should be secured further for production.
-
-If you want, I can also add a quick `README` section for deployment or describe how to extend the system with plagiarism detection or email notifications.
+**Built with ❤️ for education**
