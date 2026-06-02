@@ -4,3 +4,6 @@ out
 .env*
 .DS_Store
 public/uploads
+.vercel
+*.mp4
+public/demo/

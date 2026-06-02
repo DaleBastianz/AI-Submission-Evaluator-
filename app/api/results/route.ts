@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from '../../../lib/session';
 import prisma from '../../../lib/prisma';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: Request) {
   const session = await getServerSession(request);
   const url = new URL(request.url);

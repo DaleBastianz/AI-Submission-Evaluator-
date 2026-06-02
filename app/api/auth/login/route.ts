@@ -3,8 +3,6 @@ import { verifyPassword } from '../../../../lib/password';
 import prisma from '../../../../lib/prisma';
 import { applySessionCookies, getSessionCookies } from '../../../../lib/session';
 
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
   try {
     const body = await request.json();

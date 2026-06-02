@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI Submission Evaluator — Demo</title>
+    <style>
+      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:#0f1724; color:#e6edf3; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+      .wrap { max-width:900px; width:100%; padding:24px; }
+      h1 { margin:0 0 12px 0; font-size:20px; }
+      p { color:#9aa8b7; }
+      video { width:100%; height:auto; border-radius:8px; background:#000; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>AI Submission Evaluator — Demo Video</h1>
+      <p>Place your demo video at <strong>/public/demo/demo.mp4</strong> (MP4, H.264). The player below will load it automatically.</p>
+      <video controls playsinline>
+        <source src="/demo/demo.mp4" type="video/mp4">
+        Your browser does not support the video tag. You can also download the file <a href="/demo/demo.mp4">here</a>.
+      </video>
+      <p style="margin-top:12px;color:#9aa8b7;">If the video does not appear, ensure the file is named <strong>demo.mp4</strong> and uploaded to the repository at <strong>public/demo/demo.mp4</strong>, then restart the dev server.</p>
+    </div>
+  </body>
+</html>
