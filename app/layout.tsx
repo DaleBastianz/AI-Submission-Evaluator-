@@ -5,7 +5,11 @@ import { Providers } from '../components/Providers';
 
 export const metadata: Metadata = {
   title: 'EduAI — AI-Powered Learning Management System',
-  description: 'EduAI is a student-centric LMS with AI tutor, exam coach, content hub, and study tools.'
+  description: 'EduAI is a student-centric LMS with AI tutor, exam coach, content hub, and study tools.',
+  icons: {
+    icon: '/app-icon.png',
+    apple: '/app-icon.png',
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
