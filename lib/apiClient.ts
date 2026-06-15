@@ -1,3 +1,22 @@
+/** Parse JSON from an API response without throwing on empty bodies. */
+export async function parseApiJson<T = Record<string, unknown>>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    throw new Error(
+      response.ok
+        ? 'Server returned an empty response.'
+        : `Request failed (${response.status}). The server or database may be unavailable — try again in a moment.`
+    );
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Server returned an invalid response (${response.status}).`);
+  }
+}
+
 /**
  * Authenticated fetch for same-origin API routes.
  * Sends session cookies and localStorage session headers (fallback).

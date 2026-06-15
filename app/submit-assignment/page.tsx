@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSession } from '../../components/Providers';
-import { apiFetch, getStoredSessionUser } from '../../lib/apiClient';
+import { apiFetch, getStoredSessionUser, parseApiJson } from '../../lib/apiClient';
 import ProtectedLayout from '../../components/ProtectedLayout';
 
 const gradeColor = {
@@ -85,7 +85,7 @@ export default function SubmitAssignmentPage() {
         body: formData
       });
 
-      const result = await response.json();
+      const result = await parseApiJson<{ error?: string; feedback?: unknown }>(response);
       if (!response.ok) {
         throw new Error(result?.error || 'Submission failed.');
       }

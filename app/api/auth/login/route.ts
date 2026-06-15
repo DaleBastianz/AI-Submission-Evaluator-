@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { toUserFacingDbError } from '../../../../lib/dbErrors';
 import { verifyPassword } from '../../../../lib/password';
 import prisma from '../../../../lib/prisma';
 import { applySessionCookies, getSessionCookies } from '../../../../lib/session';
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
     });
     return applySessionCookies(response, cookies);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Login failed.' }, { status: 500 });
+    const message = toUserFacingDbError(error);
+    const status = message.includes('unreachable') || message.includes('waking up') ? 503 : 500;
+    return NextResponse.json({ error: message || 'Login failed.' }, { status });
   }
 }

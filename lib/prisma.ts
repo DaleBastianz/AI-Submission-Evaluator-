@@ -7,7 +7,8 @@ declare global {
 
 const prismaClientSingleton = () => {
   return new PrismaClient({
-    errorFormat: 'minimal'
+    errorFormat: 'minimal',
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error']
   });
 };
 

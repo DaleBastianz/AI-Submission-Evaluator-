@@ -65,6 +65,13 @@ export function toUserFacingGeminiError(error: unknown): string {
     // not JSON
   }
 
+  if (/Unable to parse Gemini JSON/i.test(message)) {
+    return (
+      'The AI returned an incomplete response (often because the answer was too long). ' +
+      'Try again, use a shorter past paper, or ask one question at a time.'
+    );
+  }
+
   if (message.length > 320) {
     return `${message.slice(0, 320)}…`;
   }

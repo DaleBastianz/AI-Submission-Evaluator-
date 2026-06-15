@@ -63,10 +63,19 @@ export async function POST(request: Request) {
 
     let prompt = '';
     if (fileUrl) {
-      prompt = `You are an AI tutor that solves past paper questions. Extract all individual questions from the following paper content, then generate structured answers.
+      prompt = `You are an AI tutor that solves past paper questions. Extract up to 5 of the most important individual questions from the paper content below, then generate structured answers.
 
 Paper text:\n${paperText}\n
-If lecture content is available, cross-reference concepts with the lectures. Output only valid JSON:
+If lecture content is available, cross-reference concepts with the lectures.
+
+Rules:
+- Maximum 5 questions in the array.
+- Keep each question text under 40 words.
+- Keep shortAnswer under 50 words.
+- Keep detailedAnswer under 120 words.
+- markSchemeHints: maximum 3 short bullet strings per question.
+
+Output only valid JSON:
 { "questions": [ { "question": "...", "shortAnswer": "...", "detailedAnswer": "...", "markSchemeHints": ["..."], "relatedTopics": ["..."], "difficulty": "easy|medium|hard", "lectureReference": "filename or null" } ] }
 
 Lecture content:\n${lectureText}
@@ -79,7 +88,7 @@ Lecture content:\n${lectureText}
 Return ONLY raw JSON. No markdown, no code blocks, no explanation. Start your response with { and end with }`;
     }
 
-    const aiResult = await callGemini(prompt, undefined, 4096);
+    const aiResult = await callGemini(prompt, undefined, 8192);
     const record = await prisma.pastPaper.create({
       data: {
         userId: session.user.id,

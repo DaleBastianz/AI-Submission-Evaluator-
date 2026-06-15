@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ProtectedLayout from '../../components/ProtectedLayout';
-import { apiFetch } from '../../lib/apiClient';
+import { apiFetch, parseApiJson } from '../../lib/apiClient';
 
 interface LectureItem {
   id: string;
@@ -24,7 +24,7 @@ export default function ContentHubPage() {
   const fetchLectures = async () => {
     try {
       const response = await apiFetch('/api/content-hub/list');
-      const data = await response.json();
+      const data = await parseApiJson<{ error?: string; lectures?: LectureItem[] }>(response);
       if (!response.ok) {
         throw new Error(data.error || 'Unable to retrieve lectures.');
       }
@@ -65,7 +65,7 @@ export default function ContentHubPage() {
         body: formData
       });
 
-      const result = await response.json();
+      const result = await parseApiJson<{ error?: string }>(response);
       if (!response.ok) {
         throw new Error(result.error || 'Upload failed.');
       }

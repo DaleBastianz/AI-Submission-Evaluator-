@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from '../../../../lib/session';
-import prisma from '../../../../lib/prisma';
+import { toUserFacingDbError } from '../../../../lib/dbErrors';
 import { extractTextFromBuffer, sanitizeFileName, saveUploadedFile, buildPublicUrl, normalizeDriveFolderLink } from '../../../../lib/fileUtils';
+import prisma from '../../../../lib/prisma';
+import { getServerSession } from '../../../../lib/session';
 
 const htmlToText = (html: string) => {
   return html
@@ -43,6 +44,11 @@ export async function POST(request: Request) {
     const session = await getServerSession(request);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true } });
+    if (!user) {
+      return NextResponse.json({ error: 'Session expired. Please log out and sign in again.' }, { status: 401 });
     }
 
     const formData = await request.formData();
@@ -99,6 +105,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, lectures: createdLectures });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Lecture upload failed.' }, { status: 500 });
+    const message = toUserFacingDbError(error);
+    const status = message.includes('unreachable') || message.includes('waking up') ? 503 : 500;
+    return NextResponse.json({ error: message || 'Lecture upload failed.' }, { status });
   }
 }
