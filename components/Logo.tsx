@@ -13,9 +13,9 @@ export default function Logo() {
       style={{ backgroundColor: isLight ? '#ffffff' : '#000000' }}
     >
       <Image
-        src="/app-icon.png"
+        src={isLight ? '/logo-light.png' : '/logo-dark.png'}
         alt="EduAI — Learn Smarter"
-        width={52}
+        width={168}
         height={52}
         className="h-9 w-auto object-contain sm:h-10"
         priority
